@@ -32,6 +32,7 @@ TEMPRO_DEFAULT_ENV        set to the path of a file to source before the env_fil
 TEMPRO_FUNCTIONS_ENV      set to the path of a file to source after the env_file is sourced. default to 'functions.env'
 TEMPRO_AUTO_APPROVE       if set to 'yes', the prompt will not be displayed and the command will automatically be run
 TEMPRO_PRINT_K8S_CLUSTER  if set to 'yes', print the current kubernetes cluster in the INFO section
+TEMPRO_SUB_MODE:          if set to 'yes', tempro will only template process files and echo the results
 ```
 
 ## Example
@@ -45,6 +46,8 @@ export CD_ENV_PATH="production.env"
 
 tempro $CD_ENV_PATH helm upgrade cluster-autoscaler autoscaler/cluster-autoscaler \
   --install --namespace kube-system --values \${CLOUD_PROVIDER}/values.yml
+
+TEMPRO_SUB_MODE='yes' tempro staging.env values.yml.tmpl > values.yml
 ```
 
 ```
