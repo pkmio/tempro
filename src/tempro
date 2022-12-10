@@ -5,7 +5,7 @@
 set -ae
 
 if [ "$1" = "version" ]; then
-  echo "v1.2.5";
+  echo "v1.1.0";
   exit 0;
 fi;
 
@@ -39,12 +39,15 @@ Options:
   TEMPRO_AUTO_APPROVE:      if set to 'yes', the prompt will not be displayed and the command will automatically be run
   TEMPRO_SILENT:            if set to 'yes', suppress all output
   TEMPRO_PRINT_K8S_CLUSTER: if set to 'yes', print the current kubernetes cluster in the INFO section
+  TEMPRO_SUB_MODE:          if set to 'yes', tempro will only template process files and echo the results
 
 Examples:
 
   tempro path/to/production.env helm upgrade metrics-server stable/metrics-server --values metrics-server/\${CLOUD_PROVIDER}/values.yml --install 
 
   tempro staging.env kubectl apply -f deploy.yml -f service.yml
+
+  TEMPRO_SUB_MODE='yes' tempro staging.env values.yml.tmpl > values.yml
 
 About:
 
@@ -88,13 +91,30 @@ TP_PATH="${1}"
 
 shift
 
+if [ "${TEMPRO_SUB_MODE}" = "yes" ]; then
+  TEMPRO_AUTO_APPROVE='yes';
+  TEMPRO_SILENT_LOG='yes';
+fi;
+
 if [ "${TEMPRO_SILENT}" != "yes" ]; then
-  tempro_log() {
-    printf "$@"
-  }
-  tempro_cat() {
-    cat "$@"
-  }
+  if [ "${TEMPRO_SILENT_LOG}" != "yes" ]; then
+    tempro_log() {
+      printf "$@"
+    }
+  else
+    tempro_log() {
+      :
+    }
+  fi
+  if [ "${TEMPRO_SILENT_CAT}" != "yes" ]; then
+    tempro_cat() {
+      cat "$@"
+    }
+  else
+    tempro_cat() {
+      :
+    }
+  fi
 else
   tempro_log() {
     :
@@ -200,7 +220,7 @@ done
 tempro_log "\n\n%s \n\n" "--------- INFO:";
 
 if [ "$TEMPRO_PRINT_K8S_CLUSTER" = "yes" ]; then
-  printf "\ncurrent cluster: %s\n\n" "$(kubectl config current-context)";
+  tempro_log "\ncurrent cluster: %s\n\n" "$(kubectl config current-context)";
 fi;
 
 tempro_log "env file: %s
@@ -212,10 +232,14 @@ if [ "$TEMPRO_AUTO_APPROVE" != 'yes' ]; then
   read -r
 fi
 
+if [ "$TEMPRO_SUB_MODE" != "yes" ]; then
+
 set +e
 
 eval "$TP_CMD"
 
 set -e
+
+fi;
 
 restore_files "${TP_FILES}"
