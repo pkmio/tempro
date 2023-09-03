@@ -5,7 +5,7 @@
 set -ae
 
 if [ "$1" = "version" ]; then
-  echo "v1.1.0";
+  echo "v1.2.0";
   exit 0;
 fi;
 
@@ -39,7 +39,6 @@ Options:
   TEMPRO_AUTO_APPROVE:      if set to 'yes', the prompt will not be displayed and the command will automatically be run
   TEMPRO_SILENT:            if set to 'yes', suppress all output
   TEMPRO_PRINT_K8S_CLUSTER: if set to 'yes', print the current kubernetes cluster in the INFO section
-  TEMPRO_DIFF_K8S:          if set to 'yes', will add show diffs for kubectl + helm commands
   TEMPRO_SUB_MODE:          if set to 'yes', tempro will only template process files and echo the results
 
 Examples:
@@ -65,9 +64,10 @@ About:
 
   Tempro will also substitute any environment variables found in the arguments. However, for this to work, the 
   dollar sign of the environment variable must be escaped so that it is not substitued by the shell before being passed
-  to tempro. For example: \${SOME_VAR}
+  to tempro. For example: \\\${SOME_VAR}
 
   The final templated command and files will be printed along with some info about the environment file sourced. 
+  If the command is a kubectl apply or a helm command, it will run a diff first.
 
   A prompt will be displayed allowing the user to abort running the command in case they see an error in the resulting 
   files or realize they have applied the wrong config.
@@ -156,14 +156,6 @@ do
   TP_CMD="${TP_CMD}$(printf '%s' "$x" | envsubst) "
 done
 
-if [ "$TEMPRO_DIFF_K8S" = "yes" ]; then
-  if [ "$(printf "%s" "$TP_CMD" | cut -d' ' -f1-2)" = "kubectl apply" ]; then
-    TP_CMD="$(printf "%s" "$TP_CMD" | sed 's/kubectl apply/kubectl diff/')";
-  elif [ "$(printf "%s" "$TP_CMD" | cut -d' ' -f1)" = "helm" ]; then
-    TP_CMD="$(printf "%s" "$TP_CMD" | sed 's/./& diff/4')";
-  fi;
-fi;
-
 # create temporary file
 
 TP_FILES=''
@@ -227,29 +219,38 @@ for path in $TP_FILES; do
   tempro_cat "${TP_PRM}"
 done
 
-tempro_log "\n\n%s \n\n" "--------- INFO:";
+if [ "$TEMPRO_SUB_MODE" != "yes" ]; then
+  TP_DIFF_CMD=""
+  if [ "$(printf "%s" "$TP_CMD" | cut -d' ' -f1-2)" = "kubectl apply" ]; then
+    tempro_log "\n%s \n\n" "--------- DIFF:";
+    TP_DIFF_CMD="$(printf "%s" "$TP_CMD" | sed 's/kubectl apply/kubectl diff/')";
+    set +e
+    eval "$TP_DIFF_CMD"; # kubectl diff exits 1 on success
+    set -e
+  elif [ "$(printf "%s" "$TP_CMD" | cut -d' ' -f1)" = "helm" ]; then
+    tempro_log "\n%s \n\n" "--------- DIFF:";
+    TP_DIFF_CMD="$(printf "%s" "$TP_CMD" | sed 's/./& diff/4')";
+    eval "$TP_DIFF_CMD";
+  fi;
 
-if [ "$TEMPRO_PRINT_K8S_CLUSTER" = "yes" ]; then
-  tempro_log "\ncurrent cluster: %s\n\n" "$(kubectl config current-context)";
-fi;
+  tempro_log "\n%s \n" "--------- INFO:";
 
-tempro_log "env file: %s
+  if [ "$TEMPRO_PRINT_K8S_CLUSTER" = "yes" ]; then
+    tempro_log "\ncurrent cluster: %s\n\n" "$(kubectl config current-context)";
+  fi;
+
+  tempro_log "env file: %s
 
 command: %s\n\n" "${TP_PATH}" "${TP_CMD}"
 
-if [ "$TEMPRO_AUTO_APPROVE" != 'yes' ]; then
-  echo "Press enter to continue or ^C to abort"
-  read -r
-fi
+  if [ "$TEMPRO_AUTO_APPROVE" != 'yes' ]; then
+    echo "Press enter to continue or ^C to abort"
+    read -r
+  fi;
 
-if [ "$TEMPRO_SUB_MODE" != "yes" ]; then
-
-set +e
-
-eval "$TP_CMD"
-
-set -e
-
+  set +e
+  eval "$TP_CMD"
+  set -e
 fi;
 
 restore_files "${TP_FILES}"
