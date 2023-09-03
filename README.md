@@ -32,7 +32,6 @@ TEMPRO_DEFAULT_ENV        set to the path of a file to source before the env_fil
 TEMPRO_FUNCTIONS_ENV      set to the path of a file to source after the env_file is sourced. default to 'functions.env'
 TEMPRO_AUTO_APPROVE       if set to 'yes', the prompt will not be displayed and the command will automatically be run
 TEMPRO_PRINT_K8S_CLUSTER  if set to 'yes', print the current kubernetes cluster in the INFO section
-TEMPRO_DIFF_K8S           if set to 'yes', will add show diffs for kubectl + helm commands
 TEMPRO_SUB_MODE           if set to 'yes', tempro will only template process files and echo the results
 ```
 
@@ -97,7 +96,11 @@ The original files are now copied to a hidden dot file. For example, `values.yml
 
 ### Print The Result
 
-The final post-substitution files will now be printed so that you can validate the result. You can press enter to continue or `^C` to abort.
+The final post-substitution files will now be printed so that you can validate the result. 
+
+If the command is a `helm` command or a `kubectl apply`, it will run and print a diff.
+
+You can press enter to continue or `^C` to abort.
 
 ### Run The Command
 
@@ -118,4 +121,4 @@ Finally, after your command has run (or if you aborted), the original files will
 
 ---
 
-Copyright 2021 Pkmio Ltd
+Copyright 2023 Pkmio Ltd
